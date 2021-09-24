@@ -29,6 +29,8 @@ class _HomePageState extends State<HomePage> {
 
   late final _controller = TextEditingController();
 
+  late bool _isManage = false;
+
   Future<List<NewsModel>> _fetchNews() async {
     final sharedPreferences = await SharedPreferences.getInstance();
     final userName = sharedPreferences.getString(keyUsername) ?? '';
@@ -96,6 +98,87 @@ class _HomePageState extends State<HomePage> {
     return _notes;
   }
 
+  void _showNoteBottomSheet({NoteModel? note}) async {
+    _controller.text = note != null ? note.note : '';
+
+    await showModalBottomSheet(
+      isScrollControlled: true,
+      context: context,
+      backgroundColor: Colors.black87,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: Text('Batalkan'),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        note != null ? 'Ubah Catatan' : 'Tambah Catatan',
+                        style: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      if (note != null) {
+                        await DioApi.dio.put(
+                          'account/note/${note.id}',
+                          data: {
+                            'note': _controller.text,
+                          },
+                        );
+                      } else {
+                        await DioApi.dio.post(
+                          'account/note',
+                          data: {
+                            'note': _controller.text,
+                          },
+                        );
+                      }
+
+                      _controller.clear();
+
+                      Navigator.pop(context);
+                    },
+                    child: Text('Simpan'),
+                  ),
+                  SizedBox(width: 8),
+                ],
+              ),
+              SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                ),
+                child: TextInput(
+                  controller: _controller,
+                  hintText: 'Isi catatan',
+                ),
+              ),
+              SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
+    );
+
+    setState(() {});
+  }
+
   Widget _notesPage() {
     return FutureBuilder<List<NoteModel>>(
       future: _fetchNotes(),
@@ -110,7 +193,27 @@ class _HomePageState extends State<HomePage> {
                     final note = _notes[index];
 
                     return ListTile(
+                      leading: _isManage
+                          ? IconButton(
+                              icon: Icon(Icons.edit),
+                              onPressed: () {
+                                _showNoteBottomSheet(note: note);
+                              },
+                            )
+                          : null,
                       title: Text(note.note),
+                      trailing: _isManage
+                          ? IconButton(
+                              onPressed: () async {
+                                await DioApi.dio.delete(
+                                  'account/note/${note.id}',
+                                );
+
+                                setState(() {});
+                              },
+                              icon: Icon(Icons.delete),
+                            )
+                          : null,
                     );
                   },
                 ),
@@ -123,7 +226,11 @@ class _HomePageState extends State<HomePage> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(primary: Colors.red),
                         child: const Text('Kelola Catatan'),
-                        onPressed: () {},
+                        onPressed: () {
+                          setState(() {
+                            _isManage = !_isManage;
+                          });
+                        },
                       ),
                     ),
                   ),
@@ -133,76 +240,8 @@ class _HomePageState extends State<HomePage> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(primary: Colors.green),
                         child: const Text('Tambah Catatan'),
-                        onPressed: () async {
-                          await showModalBottomSheet(
-                            isScrollControlled: true,
-                            context: context,
-                            backgroundColor: Colors.black87,
-                            builder: (context) {
-                              return Container(
-                                padding: EdgeInsets.only(
-                                  bottom:
-                                      MediaQuery.of(context).viewInsets.bottom,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        SizedBox(width: 8),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                          },
-                                          child: Text('Batalkan'),
-                                        ),
-                                        const Expanded(
-                                          child: Center(
-                                            child: Text(
-                                              'Tambah Catatan',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            final response =
-                                                await DioApi.dio.post(
-                                              'account/note',
-                                              data: {
-                                                'note': _controller.text,
-                                              },
-                                            );
-
-                                            _controller.clear();
-
-                                            Navigator.pop(context);
-                                          },
-                                          child: Text('Simpan'),
-                                        ),
-                                        SizedBox(width: 8),
-                                      ],
-                                    ),
-                                    SizedBox(height: 16),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                      ),
-                                      child: TextInput(
-                                        controller: _controller,
-                                        hintText: 'Isi catatan',
-                                      ),
-                                    ),
-                                    SizedBox(height: 32),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-
-                          _notesPage();
+                        onPressed: () {
+                          _showNoteBottomSheet();
                         },
                       ),
                     ),
