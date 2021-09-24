@@ -54,7 +54,7 @@ class NewsModel {
       isi: json['isi'] ?? '',
       tglTampil: json['tgl_tampil'] ?? '',
       img: json['img'] ?? '',
-      author: json['auhtor'] ?? '',
+      author: json['author'] ?? '',
     );
   }
 }

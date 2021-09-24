@@ -76,8 +76,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  void initState() {
+    super.initState();
 
     SharedPreferences.getInstance().then((sharedPreferences) {
       final String userName = sharedPreferences.getString(keyUsername) ?? '';

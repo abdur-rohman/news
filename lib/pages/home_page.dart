@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:news/helpers/constant.dart';
 import 'package:news/helpers/dio_api.dart';
 import 'package:news/models/info_model.dart';
+import 'package:news/models/note_model.dart';
+import 'package:news/widgets/text_input.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
@@ -20,44 +22,37 @@ class _HomePageState extends State<HomePage> {
     1: const Text('Catatan'),
   };
   late final fullWidth = MediaQuery.of(context).size.width;
-  late bool _isLoading = false;
+  late final fullHeight = MediaQuery.of(context).size.height;
+
   late final List<NewsModel> _news = [];
+  late final List<NoteModel> _notes = [];
 
-  void _fetchNews() async {
-    setState(() {
-      _isLoading = true;
-    });
+  late final _controller = TextEditingController();
 
-    try {
-      final sharedPreferences = await SharedPreferences.getInstance();
-      final userName = sharedPreferences.getString(keyUsername) ?? '';
+  Future<List<NewsModel>> _fetchNews() async {
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final userName = sharedPreferences.getString(keyUsername) ?? '';
 
-      final Response response = await DioApi.dio.get(
-        'main/get_Information/$userName',
-      );
+    final Response response = await DioApi.dio.get(
+      'main/get_Information/$userName',
+    );
 
-      final InfoModel infoModel = InfoModel.fromJson(response.data);
+    final InfoModel infoModel = InfoModel.fromJson(response.data);
 
-      _news.clear();
-      for (var item in infoModel.data.news) {
-        _news.add(item);
-      }
-    } catch (e, stackTrace) {
-      print('Error: $e');
-      print('StackTrace: $stackTrace');
+    _news.clear();
+    for (var item in infoModel.data.news) {
+      _news.add(item);
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    return _news;
   }
 
-  late final _pages = <Widget>[
-    _isLoading
-        ? Center(
-            child: CircularProgressIndicator(),
-          )
-        : ListView.builder(
+  Widget _newsPage() {
+    return FutureBuilder<List<NewsModel>>(
+      future: _fetchNews(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          return ListView.builder(
             itemCount: _news.length,
             itemBuilder: (context, index) {
               final news = _news[index];
@@ -67,33 +62,173 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   children: [
                     Image.network(news.img),
-                    SizedBox(height: 8),
                     ListTile(
                       title: Text(news.author),
                       subtitle: Text(news.tglTampil),
                     ),
-                    SizedBox(height: 8),
-                    Text(news.isi)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      child: Text(news.isi),
+                    )
                   ],
                 ),
               );
             },
-          ),
-    Center(
-      child: Text('Aplikasi Catatan'),
-    )
-  ];
+          );
+        }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    _fetchNews();
+        return Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
   }
+
+  Future<List<NoteModel>> _fetchNotes() async {
+    final Response response = await DioApi.dio.get('account/note');
+    final accountNoteModel = AccountNoteModel.fromJson(response.data);
+
+    _notes.clear();
+    for (var item in accountNoteModel.listNote) {
+      _notes.add(item);
+    }
+
+    return _notes;
+  }
+
+  Widget _notesPage() {
+    return FutureBuilder<List<NoteModel>>(
+      future: _fetchNotes(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _notes.length,
+                  itemBuilder: (context, index) {
+                    final note = _notes[index];
+
+                    return ListTile(
+                      title: Text(note.note),
+                    );
+                  },
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(primary: Colors.red),
+                        child: const Text('Kelola Catatan'),
+                        onPressed: () {},
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(primary: Colors.green),
+                        child: const Text('Tambah Catatan'),
+                        onPressed: () async {
+                          await showModalBottomSheet(
+                            isScrollControlled: true,
+                            context: context,
+                            backgroundColor: Colors.black87,
+                            builder: (context) {
+                              return Container(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      MediaQuery.of(context).viewInsets.bottom,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        SizedBox(width: 8),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          child: Text('Batalkan'),
+                                        ),
+                                        const Expanded(
+                                          child: Center(
+                                            child: Text(
+                                              'Tambah Catatan',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            final response =
+                                                await DioApi.dio.post(
+                                              'account/note',
+                                              data: {
+                                                'note': _controller.text,
+                                              },
+                                            );
+
+                                            _controller.clear();
+
+                                            Navigator.pop(context);
+                                          },
+                                          child: Text('Simpan'),
+                                        ),
+                                        SizedBox(width: 8),
+                                      ],
+                                    ),
+                                    SizedBox(height: 16),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: TextInput(
+                                        controller: _controller,
+                                        hintText: 'Isi catatan',
+                                      ),
+                                    ),
+                                    SizedBox(height: 32),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+
+                          _notesPage();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            ],
+          );
+        }
+
+        return Center(
+          child: CupertinoActivityIndicator(),
+        );
+      },
+    );
+  }
+
+  List<Widget> _pages() => <Widget>[
+        _newsPage(),
+        _notesPage(),
+      ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -110,7 +245,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
-            Expanded(child: _pages[_selectedMenu]),
+            Expanded(child: _pages()[_selectedMenu]),
           ],
         ),
       ),
